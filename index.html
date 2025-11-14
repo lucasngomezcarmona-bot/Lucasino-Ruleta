@@ -1,130 +1,165 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ruleta con Probabilidades</title>
-  <style>
+<meta charset="UTF-8">
+<title>Ruleta</title>
+<style>
     body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-      background: #111;
-      color: #fff;
-      font-family: Arial, sans-serif;
+        background: #111;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        color: white;
+        font-family: Arial, sans-serif;
     }
-    #wheel {
-      width: 300px;
-      height: 300px;
-      border: 8px solid #fff;
-      border-radius: 50%;
-      position: relative;
-      overflow: hidden;
-      transition: transform 4s cubic-bezier(0.33, 1, 0.68, 1);
-    }
-    .slice {
-      position: absolute;
-      width: 50%;
-      height: 50%;
-      top: 50%;
-      left: 50%;
-      transform-origin: 0% 0%;
-      border: 1px solid #000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 18px;
-      color: #fff;
-    }
-    #pointer {
-      width: 0;
-      height: 0;
-      border-left: 20px solid transparent;
-      border-right: 20px solid transparent;
-      border-bottom: 30px solid red;
-      margin-bottom: 10px;
-    }
-    button {
-      margin-top: 25px;
-      padding: 16px 32px;
-      font-size: 22px;
-      background: #e60000;
-      border: none;
-      color: #fff;
-      cursor: pointer;
-      border-radius: 10px;
-      font-weight: bold;
-    }
-    button:hover {
-      background: #ff2d2d;
-    }
+
     #coins {
-      margin-bottom: 20px;
-      font-size: 24px;
-      font-weight: bold;
+        font-size: 30px;
+        margin-bottom: 20px;
+        font-weight: bold;
     }
-  </style>
+
+    #wheelContainer {
+        position: relative;
+        width: 300px;
+        height: 300px;
+        margin-bottom: 30px;
+    }
+
+    #wheel {
+        width: 100%;
+        height: 100%;
+        border: 10px solid white;
+        border-radius: 50%;
+        transition: transform 4s ease-out;
+    }
+
+    /* Triángulo indicador */
+    #pointer {
+        position: absolute;
+        top: -25px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0;
+        height: 0;
+        border-left: 15px solid transparent;
+        border-right: 15px solid transparent;
+        border-bottom: 25px solid red;
+    }
+
+    #spinButton {
+        background: red;
+        color: white;
+        border: none;
+        padding: 15px 30px;
+        font-size: 20px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+
+    #spinButton:hover {
+        background: rgb(200,0,0);
+    }
+</style>
 </head>
 <body>
 
-  <div id="coins">Monedas: 100</div>
-  <div id="pointer"></div>
-  <div id="wheel"></div>
-  <button onclick="spinWheel()">Girar</button>
+<div id="coins">Monedas: 100</div>
 
-  <script>
+<div id="wheelContainer">
+    <div id="pointer"></div>
+    <canvas id="wheel" width="300" height="300"></canvas>
+</div>
+
+<button id="spinButton">Girar</button>
+
+<script>
+    const canvas = document.getElementById("wheel");
+    const ctx = canvas.getContext("2d");
+    const spinButton = document.getElementById("spinButton");
+    const coinsText = document.getElementById("coins");
+
     let coins = 100;
-    const coinDisplay = document.getElementById("coins");
-    const wheel = document.getElementById("wheel");
 
-    const results = [
-      { text: "x4", color: "green", weight: 10 },
-      { text: "x3", color: "green", weight: 15 },
-      { text: "x2", color: "green", weight: 20 },
-      { text: "÷4", color: "red", weight: 55 }
+    // Probabilidades:
+    // 10% → x4 (verde)
+    // 15% → x3 (verde)
+    // 20% → x2 (verde)
+    // 55% → x0.4 (rojo)
+
+    const sectors = [
+        { label: "x4", color: "green", prob: 0.10, mult: 4 },
+        { label: "x3", color: "green", prob: 0.15, mult: 3 },
+        { label: "x2", color: "green", prob: 0.20, mult: 2 },
+        { label: "x0.4", color: "red", prob: 0.55, mult: 0.4 }
     ];
 
-    const slices = results.length;
-    for (let i = 0; i < slices; i++) {
-      const slice = document.createElement("div");
-      slice.className = "slice";
-      slice.style.transform = `rotate(${(360 / slices) * i}deg) skewY(-45deg)`;
-      slice.style.background = results[i].color;
-      slice.innerHTML = results[i].text;
-      wheel.appendChild(slice);
+    // Convertir probabilidades en una rueda dividida
+    let angles = [];
+    let startAngle = 0;
+
+    sectors.forEach(sec => {
+        const angle = sec.prob * Math.PI * 2;
+        angles.push({ ...sec, start: startAngle, end: startAngle + angle });
+        startAngle += angle;
+    });
+
+    // Dibujar la ruleta
+    function drawWheel() {
+        angles.forEach(sec => {
+            ctx.beginPath();
+            ctx.moveTo(150, 150);
+            ctx.arc(150, 150, 140, sec.start, sec.end);
+            ctx.fillStyle = sec.color;
+            ctx.fill();
+            ctx.save();
+
+            // Poner texto
+            ctx.translate(150, 150);
+            ctx.rotate((sec.start + sec.end) / 2);
+            ctx.textAlign = "right";
+            ctx.fillStyle = "white";
+            ctx.font = "20px Arial";
+            ctx.fillText(sec.label, 120, 10);
+            ctx.restore();
+        });
     }
 
-    function chooseWeighted() {
-      let total = results.reduce((acc, r) => acc + r.weight, 0);
-      let rand = Math.random() * total;
-      for (let r of results) {
-        if (rand < r.weight) return r;
-        rand -= r.weight;
-      }
-    }
+    drawWheel();
+
+    let spinning = false;
+    let currentAngle = 0;
 
     function spinWheel() {
-      const selected = chooseWeighted();
-      const index = results.indexOf(selected);
-      const degrees = (360 / slices) * index + 360 * 5;
-      wheel.style.transform = `rotate(${degrees}deg)`;
+        if (spinning) return;
+        spinning = true;
 
-      setTimeout(() => {
-        if (selected.text.startsWith("x")) {
-          const mult = parseInt(selected.text.replace("x", ""));
-          coins *= mult;
-        } else {
-          coins = Math.floor(coins / 4);
-        }
-        coinDisplay.textContent = "Monedas: " + coins;
-      }, 4000);
+        const spinAmount = Math.random() * Math.PI * 2 + Math.PI * 6;
+        currentAngle += spinAmount;
+
+        canvas.style.transition = "transform 4s ease-out";
+        canvas.style.transform = `rotate(${currentAngle}rad)`;
+
+        setTimeout(() => {
+            const finalAngle = (currentAngle % (Math.PI * 2));
+
+            let result = sectors.find(sec => finalAngle >= sec.start && finalAngle < sec.end);
+
+            if (!result) result = sectors[sectors.length - 1];
+
+            coins = Math.floor(coins * result.mult);
+            coinsText.textContent = "Monedas: " + coins;
+
+            spinning = false;
+        }, 4000);
     }
-  </script>
-</body>
-  <script src="script.js"></script>
 
+    spinButton.addEventListener("click", spinWheel);
+</script>
+
+</body>
 </html>
