@@ -1,214 +1,238 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Ruleta</title>
+<meta charset="UTF-8" />
+<title>Ruleta Casino</title>
 <style>
     body {
+        margin: 0;
         background: orange;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
         height: 100vh;
-        margin: 0;
         font-family: Arial, sans-serif;
+        color: white;
         overflow: hidden;
     }
 
     #coins {
-        font-size: 30px;
-        margin-bottom: 20px;
+        font-size: 40px;
         font-weight: bold;
-        color: white;
-        text-shadow: 2px 2px 4px black;
-    }
-
-    #wheelContainer {
-        position: relative;
-        width: 300px;
-        height: 300px;
+        text-shadow: 3px 3px 5px black;
         margin-bottom: 20px;
     }
 
-    #wheel {
-        width: 100%;
-        height: 100%;
-        border: 12px solid yellow;
+    canvas {
+        border: 10px solid #FFD700;
         border-radius: 50%;
-        transition: transform 4s ease-out;
+        background: #222;
     }
 
-    /* Flecha estilo casino */
-    #sidePointer {
-        position: absolute;
-        right: -40px;
-        top: 50%;
-        transform: translateY(-50%);
+    #controls {
+        margin-top: 20px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+
+    /* Botón Girar */
+    #spinBtn {
+        width: 130px;
+        height: 130px;
+        border-radius: 50%;
+        background: red;
+        border: 5px solid white;
+        color: white;
+        font-size: 25px;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 0 20px black;
+    }
+
+    #spinBtn:active {
+        transform: scale(0.95);
+    }
+
+    /* Botón +5 */
+    #addBtn {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: #00dd00;
+        border: 4px solid white;
+        color: white;
+        font-size: 22px;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 0 15px black;
+    }
+
+    #addBtn:active {
+        transform: scale(0.9);
+    }
+
+    /* Flecha a la derecha */
+    .arrow {
         width: 0;
         height: 0;
         border-top: 25px solid transparent;
         border-bottom: 25px solid transparent;
-        border-right: 40px solid gold;
-        filter: drop-shadow(0 0 6px white);
-    }
-
-    #spinButton {
-        background: red;
-        color: white;
-        border: 4px solid white;
-        width: 120px;
-        height: 120px;
-        border-radius: 50%;
-        font-size: 20px;
-        cursor: pointer;
-        transition: 0.2s;
-    }
-
-    #spinButton:hover {
-        transform: scale(1.1);
-        box-shadow: 0 0 15px white;
-    }
-
-    /* Partículas */
-    .particle {
+        border-left: 35px solid yellow;
         position: absolute;
-        width: 8px;
-        height: 8px;
-        background: yellow;
-        border-radius: 50%;
-        pointer-events: none;
-        animation: particleAnim 0.8s ease-out forwards;
+        right: calc(50% - 235px);
+        top: 50%;
+        transform: translateY(-50%);
+        filter: drop-shadow(0 0 10px yellow);
     }
-
-    @keyframes particleAnim {
-        from { opacity: 1; transform: translate(0,0) scale(1); }
-        to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0); }
-    }
-
 </style>
 </head>
 <body>
 
 <div id="coins">Monedas: 100</div>
+<div class="arrow"></div>
+<canvas id="wheel" width="500" height="500"></canvas>
 
-<div id="wheelContainer">
-    <canvas id="wheel" width="300" height="300"></canvas>
-
-    <!-- Flecha derecha estilo casino -->
-    <div id="sidePointer"></div>
+<div id="controls">
+    <button id="spinBtn">Girar</button>
+    <button id="addBtn">+5</button>
 </div>
 
-<button id="spinButton">Girar</button>
-
 <script>
-    const canvas = document.getElementById("wheel");
-    const ctx = canvas.getContext("2d");
-    const spinButton = document.getElementById("spinButton");
-    const coinsText = document.getElementById("coins");
+let canvas = document.getElementById("wheel");
+let ctx = canvas.getContext("2d");
 
-    let coins = 100;
+let coins = 100;
+document.getElementById("coins").textContent = "Monedas: " + coins;
 
-    // Sectores
-    const sectors = [
-        { label: "x4", color: "green", prob: 0.10, mult: 4 },
-        { label: "x3", color: "green", prob: 0.15, mult: 3 },
-        { label: "x2", color: "green", prob: 0.20, mult: 2 },
-        { label: "x0.4", color: "red", prob: 0.55, mult: 0.4 }
-    ];
+let currentAngle = 0;
+let spinning = false;
 
-    // Convertir probabilidad a ángulo
-    let angles = [];
-    let startAngle = 0;
-    sectors.forEach(sec => {
-        const angle = sec.prob * Math.PI * 2;
-        angles.push({ ...sec, start: startAngle, end: startAngle + angle });
-        startAngle += angle;
+const sectors = [
+    { text: "x4",   color: "green", angle: Math.PI * 0.2 },  // 10%
+    { text: "x3",   color: "green", angle: Math.PI * 0.3 },  // 15%
+    { text: "x2",   color: "green", angle: Math.PI * 0.4 },  // 20%
+    { text: "x0.4", color: "red",   angle: Math.PI * 1.1 }   // 55%
+];
+
+function drawWheel() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(250, 250);
+    ctx.rotate(currentAngle);
+
+    let start = 0;
+    sectors.forEach(s => {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.fillStyle = s.color;
+        ctx.arc(0, 0, 220, start, start + s.angle);
+        ctx.fill();
+
+        ctx.save();
+        ctx.rotate(start + s.angle / 2);
+        ctx.fillStyle = "white";
+        ctx.font = "30px Arial";
+        ctx.fillText(s.text, 110, 10);
+        ctx.restore();
+
+        start += s.angle;
     });
 
-    // Dibujar ruleta
-    function drawWheel() {
-        angles.forEach(sec => {
-            ctx.beginPath();
-            ctx.moveTo(150, 150);
-            ctx.arc(150, 150, 140, sec.start, sec.end);
-            ctx.fillStyle = sec.color;
-            ctx.fill();
-            ctx.save();
+    ctx.restore();
+}
 
-            ctx.translate(150, 150);
-            ctx.rotate((sec.start + sec.end) / 2);
-            ctx.textAlign = "right";
-            ctx.fillStyle = "white";
-            ctx.font = "20px Arial";
-            ctx.fillText(sec.label, 120, 10);
-            ctx.restore();
-        });
+/* Detectar sector ganador */
+function getResult() {
+    let angle = (currentAngle % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+    let pointerAngle = (Math.PI * 2) - angle;
+
+    let accum = 0;
+    for (let s of sectors) {
+        accum += s.angle;
+        if (pointerAngle <= accum) return s;
     }
-    drawWheel();
+    return sectors[sectors.length - 1];
+}
 
-    let spinning = false;
-    let currentAngle = 0;
+/* Partículas al ganar */
+function spawnParticles() {
+    for (let i = 0; i < 25; i++) {
+        const p = document.createElement("div");
+        p.style.position = "absolute";
+        p.style.width = "10px";
+        p.style.height = "10px";
+        p.style.borderRadius = "50%";
+        p.style.background = "white";
+        p.style.left = "50%";
+        p.style.top = "50%";
+        p.style.pointerEvents = "none";
+        p.style.opacity = "1";
+        document.body.appendChild(p);
 
-    // Partículas al ganar
-    function spawnParticles() {
-        for (let i = 0; i < 20; i++) {
-            const p = document.createElement("div");
-            p.classList.add("particle");
+        let angle = Math.random() * Math.PI * 2;
+        let speed = 4 + Math.random() * 4;
 
-            const angle = Math.random() * Math.PI * 2;
-            const distance = 80 + Math.random() * 40;
+        let vx = Math.cos(angle) * speed;
+        let vy = Math.sin(angle) * speed;
 
-            p.style.setProperty('--dx', Math.cos(angle) * distance + "px");
-            p.style.setProperty('--dy', Math.sin(angle) * distance + "px");
+        let interval = setInterval(() => {
+            let rect = p.getBoundingClientRect();
+            p.style.left = rect.left + vx + "px";
+            p.style.top = rect.top + vy + "px";
+            p.style.opacity -= 0.03;
+            if (p.style.opacity <= 0) {
+                clearInterval(interval);
+                p.remove();
+            }
+        }, 16);
+    }
+}
 
-            p.style.left = (window.innerWidth / 2) + "px";
-            p.style.top = (window.innerHeight / 2 - 50) + "px";
+function spin() {
+    if (spinning) return;
+    spinning = true;
 
-            document.body.appendChild(p);
+    let spinAmount = (Math.random() * Math.PI * 2) + (Math.PI * 6);
+    let duration = 2500;
+    let start = performance.now();
 
-            setTimeout(() => p.remove(), 800);
+    function animate(now) {
+        let progress = (now - start) / duration;
+        if (progress >= 1) progress = 1;
+
+        currentAngle += (spinAmount * (1 - Math.pow(progress, 3))) * 0.05;
+
+        drawWheel();
+
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        } else {
+            let result = getResult();
+            if (result.text === "x0.4") {
+                coins = Math.floor(coins * 0.4);
+            } else {
+                coins = Math.floor(coins * Number(result.text.substring(1)));
+                spawnParticles();
+            }
+            document.getElementById("coins").textContent = "Monedas: " + coins;
+            spinning = false;
         }
     }
 
-    function spinWheel() {
-        if (spinning) return;
-        spinning = true;
+    requestAnimationFrame(animate);
+}
 
-        const spinAmount = Math.random() * Math.PI * 2 + Math.PI * 6;
-        currentAngle += spinAmount;
+/* Botón +5 */
+document.getElementById("addBtn").onclick = () => {
+    coins += 5;
+    document.getElementById("coins").textContent = "Monedas: " + coins;
+};
 
-        canvas.style.transition = "transform 4s ease-out";
-        canvas.style.transform = `rotate(${currentAngle}rad)`;
+document.getElementById("spinBtn").onclick = spin;
 
-        setTimeout(() => {
-            let finalAngle = (currentAngle % (Math.PI * 2));
-
-            // Como la flecha está a la DERECHA, el ángulo coincide con 0 rad apuntando a la izquierda
-            // Ajustar referencia
-            finalAngle = finalAngle;
-
-            // Evitar zona exacta entre sectores
-            finalAngle += 0.0001;
-            if (finalAngle >= Math.PI * 2) finalAngle -= Math.PI * 2;
-
-            // Buscar sector
-            let result = angles.find(
-                sec => finalAngle >= sec.start && finalAngle < sec.end
-            );
-
-            // Aplicar multiplicador
-            coins = Math.floor(coins * result.mult);
-            coinsText.textContent = "Monedas: " + coins;
-
-            // Partículas si ganas
-            if (result.mult >= 2) spawnParticles();
-
-            spinning = false;
-        }, 4000);
-    }
-
-    spinButton.addEventListener("click", spinWheel);
+drawWheel();
 </script>
 
 </body>
