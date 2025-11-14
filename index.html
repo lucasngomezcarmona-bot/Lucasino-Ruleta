@@ -1,14 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Ruleta Casino</title>
+<style>
+
+body {
+  background: #ff8c00;
+  font-family: Arial, sans-serif;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 30px;
+  overflow-x: hidden;
+}
+
+/* Contenedor centrado */
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Ruleta */
+#wheel {
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  border: 10px solid yellow;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 20px #0005 inset;
+}
+
+/* Sectores */
+.segment {
+  position: absolute;
+  width: 50%;
+  height: 50%;
+  top: 50%;
+  left: 50%;
+  transform-origin: 0% 0%;
+}
+
+/* Flecha lateral derecha */
+.pointer {
+  width: 0;
+  height: 0;
+  border-top: 20px solid transparent;
+  border-bottom: 20px solid transparent;
+  border-left: 30px solid white;
+  position: absolute;
+  left: calc(50% + 170px);
+  top: 50%;
+  transform: translateY(-50%);
+  filter: drop-shadow(0 0 5px #fff);
+}
+
+/* Botón girar */
+#spinBtn {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  border: 4px solid white;
+  background: red;
+  color: white;
+  font-size: 22px;
+  margin-top: 20px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+#spinBtn:active {
+  transform: scale(0.9);
+}
+
+/* Botón +5 */
+#add5 {
+  margin-top: 15px;
+  padding: 8px 15px;
+  background: #222;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 2px solid white;
+}
+
+/* Cuenta de monedas */
+#coins {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+
+/* Partículas */
+.particle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  pointer-events: none;
+  transition: transform 0.8s, opacity 0.8s;
+}
+
+/* Adaptación móvil */
+@media (max-width: 480px) {
+  #wheel {
+    width: 250px;
+    height: 250px;
+  }
+
+  .pointer {
+    left: calc(50% + 140px);
+  }
+
+  #spinBtn {
+    width: 90px;
+    height: 90px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <div id="coins">Monedas: 100</div>
+
+  <!-- Ruleta -->
+  <div id="wheel"></div>
+
+  <!-- Flecha lateral -->
+  <div class="pointer"></div>
+
+  <!-- Botón girar -->
+  <button id="spinBtn">Girar</button>
+
+  <!-- Botón +5 -->
+  <button id="add5">+5</button>
+
+</div>
+
 <script>
+// -------------------------
+// CREAR RULETA DINÁMICAMENTE
+// -------------------------
+const wheel = document.getElementById("wheel");
+
+const segments = [
+  { label: "x4", color: "green", multiplier: 4, chance: 10 },
+  { label: "x3", color: "green", multiplier: 3, chance: 15 },
+  { label: "x2", color: "green", multiplier: 2, chance: 20 },
+  { label: "÷4", color: "red", multiplier: -4, chance: 55 }
+];
+
+for (let i = 0; i < segments.length; i++) {
+  const seg = document.createElement("div");
+  seg.classList.add("segment");
+
+  const angle = (360 / segments.length) * i;
+
+  seg.style.background = segments[i].color;
+  seg.style.transform = `rotate(${angle}deg) skewY(60deg)`;
+  seg.style.opacity = "0.85";
+
+  wheel.appendChild(seg);
+
+  const label = document.createElement("div");
+  label.style.position = "absolute";
+  label.style.transform = `rotate(${angle + 45}deg)`;
+  label.style.top = "10%";
+  label.style.left = "25%";
+  label.style.fontSize = "22px";
+  label.style.fontWeight = "bold";
+  label.style.color = "white";
+  label.textContent = segments[i].label;
+
+  wheel.appendChild(label);
+}
+
 // -------------------------
 // ELEMENTOS
 // -------------------------
-const wheel = document.getElementById("wheel");
 const spinBtn = document.getElementById("spinBtn");
 const coinsEl = document.getElementById("coins");
 const addBtn = document.getElementById("add5");
 
 // -------------------------
-// MONEDAS (con localStorage)
+// MONEDAS LOCALSTORAGE
 // -------------------------
 let coins = parseInt(localStorage.getItem("coins") || "100");
 coinsEl.textContent = "Monedas: " + coins;
@@ -28,89 +209,65 @@ function updateButtons() {
     spinBtn.style.cursor = "pointer";
   }
 }
-
 updateButtons();
 
 // -------------------------
 // SONIDOS
 // -------------------------
-const tickSound = new Audio("tick.mp3");     // Sonido tick-tick
-const whooshSound = new Audio("whoosh.mp3"); // Sonido continuo
-
+const tickSound = new Audio("tick.mp3");
+const whooshSound = new Audio("whoosh.mp3");
 tickSound.volume = 0.6;
 whooshSound.volume = 0.5;
 
 // -------------------------
-// SECTORES DE LA RULETA
+// PROBABILIDADES
 // -------------------------
-const segments = [
-  { label: "x4", color: "green", multiplier: 4, chance: 10 },
-  { label: "x3", color: "green", multiplier: 3, chance: 15 },
-  { label: "x2", color: "green", multiplier: 2, chance: 20 },
-  { label: "÷4", color: "red", multiplier: -4, chance: 55 }
-];
-
-// Convertir porcentajes en una lista expandida
 let weighted = [];
 segments.forEach(seg => {
-  for (let i = 0; i < seg.chance; i++) {
-    weighted.push(seg);
-  }
+  for (let i = 0; i < seg.chance; i++) weighted.push(seg);
 });
 
-// -------------------------
-// ANIMACIÓN DE GIRO
-// -------------------------
 let spinning = false;
 
+// -------------------------
+// GIRO
+// -------------------------
 spinBtn.addEventListener("click", () => {
   if (spinning || coins <= 0) return;
 
   spinning = true;
 
-  // Coste: 1 giro cuesta 1 moneda
   coins -= 1;
   coinsEl.textContent = "Monedas: " + coins;
   saveCoins();
   updateButtons();
 
-  // Sonido de giro
   whooshSound.currentTime = 0;
   whooshSound.play();
 
-  // Elegir sector ganador
   const result = weighted[Math.floor(Math.random() * weighted.length)];
-
-  // Ángulo correspondiente
   const index = segments.indexOf(result);
+
   const segmentAngle = 360 / segments.length;
   const targetAngle = (index * segmentAngle) + segmentAngle / 2;
 
-  // Giro grande + ajuste final
   const finalRotation = 3600 + (360 - targetAngle);
 
   wheel.style.transition = "transform 4s cubic-bezier(.1,.9,.3,1)";
   wheel.style.transform = `rotate(${finalRotation}deg)`;
 
-  // Sonido de ticks mientras gira
   let tickInterval = setInterval(() => {
     tickSound.currentTime = 0;
     tickSound.play();
   }, 120);
 
-  // Final del giro
   setTimeout(() => {
     clearInterval(tickInterval);
 
-    const mult = result.multiplier;
-
-    // Multiplicadores positivos
-    if (mult > 0) {
-      coins += (1 * mult);
+    if (result.multiplier > 0) {
+      coins += 1 * result.multiplier;
       spawnParticles("green");
-    }
-    // Penalty ÷4
-    else {
+    } else {
       coins = Math.floor(coins / 4);
       spawnParticles("red");
     }
@@ -121,11 +278,12 @@ spinBtn.addEventListener("click", () => {
 
     wheel.style.transition = "none";
     spinning = false;
+
   }, 4100);
 });
 
 // -------------------------
-// BOTÓN +5 MONEDAS
+// BOTÓN +5
 // -------------------------
 addBtn.addEventListener("click", () => {
   coins += 5;
@@ -160,9 +318,10 @@ function spawnParticles(color) {
       p.style.opacity = "0";
     }, 10);
 
-    setTimeout(() => {
-      p.remove();
-    }, 900);
+    setTimeout(() => p.remove(), 900);
   }
 }
 </script>
+
+</body>
+</html>
